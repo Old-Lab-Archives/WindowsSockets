@@ -1,0 +1,37 @@
+#include<winsock.h>
+...
+int(PASCAL FAR * lpfn_recv) (SOCKET, char FAR *, int, int);
+int(PASCAL FAR * lpfn_send) (SOCKET, char FAR *, int, int);
+int(PASCAL FAR * lpfn_WSAStartup) (WORD, LPWSADATA);
+int(PASCAL FAR * lpfn_WSACleanup) (void);
+int(PASCAL FAR * lpfn_WSAGetLastError) (void);
+OFSTRUCT stFile;
+HFILE hFile;
+HINSTANCE hWinSockDLL=0;
+...
+#ifndef WIN32
+hFile=OpenFile("wsock.dll",(OFSTRUCT FAR *)&stFile,OF_EXIST);
+if(hFile!=HFILE_ERROR)
+hWinSockDLL=LoadLibrary("wsock.dll");
+#else
+hFile=OpenFile("winsock.dll",(OFSTRUCT FAR*)&stFile, OF_EXIST);
+if(hFile!=HFILE_ERROR)
+hWinSockDLL=LoadLibrary("winsock.dll");
+#endif
+if(hWinSockDLL >= 32)
+{
+(FARPROC)lpfn_recv=GetProcAddress(hWinSockDLL,"recv");
+(FARPROC)lpfn_send=GetProcAddress(hWinSockDLL,"send");
+(FARPROC)lpfn_WSAStartup=GetProcAddress(hWinSockDLL,"WSAStartup");
+(FARPROC)lpfn_WSACleanup=GetProcAddress(hWinSockDLL,"WSACleanup");
+(FARPROC)lpfn_WSAGetLastError=GetProcAddress(hWinSockDLL,"WSAGetLastError");
+if(!lpfn_recv | !lpfn_send | !lpfn_WSAStartup | !lpfn_WSACleanup | !lpfn_WSAGetLastError)
+{
+FreeLibrary(hWinSockDLL);
+hWinSockDLL=0;
+}
+}
+if(!hWinSockDLL)
+{
+MessageBox(hwnd,"Unable to load winsock.dll","error");
+}
