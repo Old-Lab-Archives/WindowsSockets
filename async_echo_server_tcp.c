@@ -152,7 +152,7 @@ BOOL CALLBACK Dlg_Main(HWND hDlg, UINT msg, UINT wParam, LPARAM lParam)
 				lpstConn=NewConn(hSock, &stRmtName);
 				if(!lpstConn)
 				{
-					/*Sample libraries added: --- to be coded deep bottom ---
+					/*Sample libraries added: --- Found in winsockx.lib ---
 					1. CenterWnd() - Moves window to center of parent window
 					2. CloseConn() - standard TCP close/shutdown
 					3. CreateLclFile() - create a file on local system
