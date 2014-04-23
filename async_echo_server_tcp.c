@@ -152,7 +152,7 @@ BOOL CALLBACK Dlg_Main(HWND hDlg, UINT msg, UINT wParam, LPARAM lParam)
 				lpstConn=NewConn(hSock, &stRmtName);
 				if(!lpstConn)
 				{
-					/*Sample libraries added: --- Found in winsockx.lib ---
+					/*Sample libraries added: --- available in winsockx.lib  and also, coded at bottom of this program ---
 					1. CenterWnd() - Moves window to center of parent window
 					2. CloseConn() - standard TCP close/shutdown
 					3. CreateLclFile() - create a file on local system
@@ -573,3 +573,43 @@ hFile= _lcreat(szFileName, 0);
 strcpy(szFileName,szRmtFile); /*replace remote filename*/
 return hFile;
 } /*end of CreateLclFile() */
+/*Function: Dlg_About()
+Displays and WinSock DLL info */
+BOOL CALLBACK Dlg_About
+{
+HWND hDlg;
+UINT msg;
+UINT wParam;
+LPARAM lParam;
+{
+char achDataBuf[WSADESCRIPTION_LEN+1];
+lParam=lParam; /*avoid warning*/
+switch(msg)
+{
+case WM_INITDIALOG:
+wsprintf(achDataBuf,"(Compiled: %s, %s) \n",(LPSTR)__DATE__,(LPSTR)__Time__);
+SetDlgItemText(hDlg, IDC_COMPILEDATE,(LPCSTR)achDataBuf);
+wsprintf(achDataBuf, "Version:%d.%d",LOBYTE(stWSAData.wVersion)/*major version*/,HIBYTE(stWSAData.wVersion))/*minor version*/;
+SetDlgItemText(hDlg,IDS_DLLVER,(LPCSTR)achDataBuf);
+wsprintf(achDataBuf,"NewVersion:%d.%d",LOBYTE(stWSAData.wVersion)/*major version*/,HIBYTE(stWSAData.wVersion))/*minor version*/;
+SetDlgItemText(hDlg,IDS_DLLHIVER,achDataBuf);
+SetDlgItemText(hDlg,IDS_DESCRIP,(LPCSTR)(stWSAData.szDescription));
+SetDlgItemText(hDlg,IDS_STATUS,(LPCSTR)(stWSAData.szSystemStatus));
+wsprintf(achDataBuf,"MaxSockets: %u",stWSAData.iMaxSockets);
+SetDlgItemText(hDlg,IDS_MAXSOCKS,(LPCSTR)achDataBuf);
+wsprintf(achDataBuf,"iMaxUdp: %u",stWSAData.iMaxUdpDg);
+SetDlgItemText(hDlg,IDS_MAXUDP,(LPCSTR)achDataBuf);
+/*center dialog box*/
+CenterWnd(hDlg,hDlgMain,TRUE);
+return FALSE;
+case WM_COMMAND:
+switch(wParam)
+{
+case IDOK:
+EndDialog(hDlg,0);
+return TRUE;
+}
+break;
+}
+return FALSE;
+} /*end of Dlg_About()*/
