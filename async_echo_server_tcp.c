@@ -664,3 +664,54 @@ break;
 }
 return(nFinalSize);
 } /*end of GetBuf() */
+/* Function:---- GethostID()
+Getting host IP address using this algorithm:
+~~ Get local host name with gethostname()
+~~ Attempt to resolve local host name with gethostbyname()
+If that fails, then
+~~ Get UDP socket
+~~ Connect UDP socket to arbitrary address and port
+~~ Use getsockname() to get local address
+*/
+LONG GetHostID()
+{
+char szLclHost [MAXHOSTNAME];
+LPHOSTENT lpstHostent;
+SOCKADDR_IN stLclAddr;
+SOCKADDR_IN stRmtAddr;
+int nAddrSize=sizeof(SOCKADDR);
+SOCKET hSock;
+int nRet;
+/*init local address to zero*/
+stLclAddr.sin_addr.s_addr=INADDR_ANY;
+/*get local host name*/
+nRet=gethostname(szLclHost,MAXHOSTNAME);
+if(nRet!=SOCKET_ERROR)
+{
+/*resolve host name for local address*/
+lpstHostent=gethostbyname((LPSTR)szLclHost);
+if(lpstHostent)
+stLclAddr.sin_addr.s_addr= *((u_long FAR*) (lpstHostent->h_addr));
+}
+/*if not yet resolved, then try second strategy*/
+if(stLclAddr.sin_addr.s_addr==INADDR_ANY)
+{
+/*Get UDP socket*/
+hSock=socket(AF_INET,SOCK_DGRAM,0);
+if(hSock!=INVALID_SOCKET)
+{
+/*connect to arbitrary port and address*/
+stRmtAddr.sin_family=AF_INET;
+stRmtAddr.sin_port=htons(IPPORT_ECHO);
+stRmtAddr.sin_addr.s_addr=inet_addr("128.127.50.1");
+nRet=connect(hSock,(LPSOCKADDR)&stRmtAddr,sizeof(SOCKADDR));
+if(nRet!=SOCKET_ERROR)
+{
+/*get local address*/
+getsockname(hSock,(LPSOCKADDR)&stLclAddr,(int FAR*)&nAddrSize);
+}
+closesocket(hSock); /*Woo hoo! Good night socket. */
+}
+}
+return(stLclAddr.sin_addr.s_addr);
+} /*End of GetHostID() */
