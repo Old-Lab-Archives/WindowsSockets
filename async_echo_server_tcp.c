@@ -642,3 +642,25 @@ lAddr=INADDR_ANY; /*failure*/
 }
 return(lAddr);
 } /*end of GetAddr()*/
+/*Function: GetBuf()
+Getting send/receive buffer space as WinSock starts with the amount requested */
+int GetBuf(SOCKET hSock, int nBigBufSize, int nOptval);
+int nRet, nTrySize, nFinalSize=0;
+for(nTrySize=nBigBufSize;nTrySize>MTU_SIZE;nTrySize>>=1)
+{
+nRet=setsockopt(hSock,SOL_SOCKET,nOptval,(char FAR*)&nTrySize,sizeof(int));
+if(nRet==SOCKET_ERROR)
+{
+int WSAErr=WSAGetLastError();
+if((WSAErr==WSAENOPROTOOPT)||(WSAErr==WSAEINVAL))
+break;
+}
+else
+{
+nRet=sizeof(int);
+getsockopt(hSock,SOL_SOCKET,nOptval,(char FAR*)&nFinalSize,&nRet);
+break;
+}
+}
+return(nFinalSize);
+} /*end of GetBuf() */
