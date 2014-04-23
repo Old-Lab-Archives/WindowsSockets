@@ -715,3 +715,46 @@ closesocket(hSock); /*Woo hoo! Good night socket. */
 }
 return(stLclAddr.sin_addr.s_addr);
 } /*End of GetHostID() */
+/*--Function: GetLclDir()
+Temporary file for later display */
+BOOL GetLclDir(LPSTR szTempFile)
+{
+#ifdef WIN32
+struct _finddata_t stFile; /* Microsoft's 32-bit 'Find' file structure */
+#else
+struct _find_t stFile; /* Microsoft's 16-bit 'Find' file structure */
+#endif
+HFILE hTempFile;
+int nNext;
+hTempFile = CreateLclFile(szTempFile);
+if(hTempFile!=HFILE_ERROR)
+{
+#ifdef WIN32
+nNext =_findfirst("*.*",&stFile);
+while(!nNext)
+{
+wsprintf(achTempBuf,"%-12s %.24s %9ld\n",stFile.name,ctime(&(stFile.time_write)),stFile.size);
+_lwrite(hTempFile,achTempBuf,strlen(achTempBuf));
+nNext= _findnext(nNext, &stFile);
+}
+#else
+nNext= _dos_findfirst("*.*",0,&stFile);
+while(!nNext)
+{
+unsigned month,day,year,hour,second,minute;
+month=(stFile.wr_date>>5) & 0XF;
+day=stFile.wr_date & 0X1F;
+year=((stFile.wr_date>>9) & 0X7F) + 80;
+hour=(stFile.wr_time>>11) & 0X1F;
+minute=(stFile.wr_time>>5) & 0X3F;
+second=(stFile.wr_time & 0X1F) << 1;
+wsprintf(achTempBuf,"%s\t\t%ld bytes \t%d-%d-%d \t%.2d:%.2d:%.2d\r\n",stFile.name,stFile.size,month,day,year,hour,minute,second);
+_lwrite(hTempFile,achTempBuf,strlen(achTempBuf));
+nNext= _dos_findnext(&stFile);
+}
+#endif
+_lclose(hTempFile);
+return(TRUE);
+}
+return(FALSE);
+} /* end of GetLclDir() */
