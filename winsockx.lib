@@ -1,0 +1,341 @@
+/*Sample libraries added:
+					1. CenterWnd() - Moves window to center of parent window
+					2. CloseConn() - standard TCP close/shutdown
+					3. CreateLclFile() - create a file on local system
+					4. Dlg_About() - displays contents
+					5. GetAddr() - returns address value for host name or address string
+					6. GetBuf() - Gets the largest possible send or receive buffer upto a limit
+					7. GetHostID() - Gets local IP address
+					8. GetLclDir() - Gets the file directory
+					9. GetPort() - Gets Port number
+					10. WSAErrStr() - Copies short error description for WinSock into a buffer
+					11. WSAperror() - Displays Winsock error value
+					*/
+/*Function: CenterWnd()
+Center window relative to the parent window */
+void CenterWnd(HWND hWnd, HWND hParentWnd, BOOL bPaint)
+{
+RECT rc2, rc1;
+RECT FAR, *lprc;
+int nWidth, nHeight, cxCenter, cyCenter;
+if(!hParentWnd) /*if we've no parent, then use desktop*/
+hParentWnd=GetDesktopWindow();
+GetWindowRect(hParentWnd,&rc2);
+lprc=(RECT FAR *)&rc2;
+cXCenter=lprc->left+((lprc->right-lprc->left)/2);
+cyCenter=lprc->top+((lprc->bottom-lprc->top)/2);
+MoveWindow(hWnd, cXCenter-(nWidtth/2), cyCenter-(nHeight/2), nWidth, nHeight, bPaint);
+return;
+} /*end of CenterWnd() */
+/*Function: CloseConn()
+Closing TCP connection, ensuring that no data loss can occur on WInSocks that post FD_CLOSE when data is still available to read
+*/
+int CloseConn(SOCKET hSock, LPSTR achInBuf, int len, HWND hWnd)
+{
+int nRet;
+char achDiscard(BUF_SIZE);
+int cbBytesToDo=len, cbBytesDone=0;
+if(hSock!=INVALID_SOCKET)
+{
+/*disable asynchronous notification if window handle is provided*/
+if(hWnd)
+{
+nRet=WSAAsyncSelect(hSock, hWnd, 0, 0);
+if(nRet==SOCKET_ERROR)
+WSAperror(WSAGetLastError(),"CloseConn() WSAAsyncSelect()");
+}
+/*half-closing the connecting*/
+nRet=shutdown(hSock,l);
+/*read remaining data*/
+for(nRet=1;(nRet && (nRet!=SOCKET_ERROR));)
+{
+if(achInBuf)
+{
+nRet=recv(hSock,&achInBuf[cbBytesDone],cbBytesToDo,0);
+if(nRet && (nRet!=SOCKET_ERROR))
+{
+cbBytesToDo-=nRet;
+cbBytesDone+=nRet;
+}
+}
+else
+{
+/*no buffer provided, so discard any data*/
+nRet=recv(hSock,achDiscard,BUF_SIZE,0);
+}
+}
+/*closing the socket*/
+closesocket(hSock);
+}
+return(nRet);
+} /*end of CloseConn()*/
+/*Function: CreateLclFile()
+Try to create a file on local system and notify user if fails and then prompt for new file name*/
+HFILE CreateLclFile(LPSTR szFileName)
+{
+HFILE hFile;
+char szRmtFile(MAXFILENAME);
+hFile= _lcreat (szFileName, 0); /*creating the file*/
+strcpy(szRmtFile,szFileName); /*save remote file name*/
+while(hFile==HFILE_ERROR)
+{
+wsprintf(achTempBuf,"Unable to create the file %s, Change the file name", szFileName);
+MessageBox(hWinMain,achTempBuf,"File Error",MB_OK | MB_ICONASTERISK);
+if(!DialogBox(hInst,MAKEINTRESOURCE(IDD_FILENAME),hWinMain,Dlg_File))
+{
+/*no new file name is provided, so quit*/
+break;
+}
+else
+{
+/*try creating a new file*/
+hFile= _lcreat(szFileName, 0);
+}
+}
+strcpy(szFileName,szRmtFile); /*replace remote filename*/
+return hFile;
+} /*end of CreateLclFile() */
+/*Function: Dlg_About()
+Displays and WinSock DLL info */
+BOOL CALLBACK Dlg_About
+{
+HWND hDlg;
+UINT msg;
+UINT wParam;
+LPARAM lParam;
+{
+char achDataBuf[WSADESCRIPTION_LEN+1];
+lParam=lParam; /*avoid warning*/
+switch(msg)
+{
+case WM_INITDIALOG:
+wsprintf(achDataBuf,"(Compiled: %s, %s) \n",(LPSTR)__DATE__,(LPSTR)__Time__);
+SetDlgItemText(hDlg, IDC_COMPILEDATE,(LPCSTR)achDataBuf);
+wsprintf(achDataBuf, "Version:%d.%d",LOBYTE(stWSAData.wVersion)/*major version*/,HIBYTE(stWSAData.wVersion))/*minor version*/;
+SetDlgItemText(hDlg,IDS_DLLVER,(LPCSTR)achDataBuf);
+wsprintf(achDataBuf,"NewVersion:%d.%d",LOBYTE(stWSAData.wVersion)/*major version*/,HIBYTE(stWSAData.wVersion))/*minor version*/;
+SetDlgItemText(hDlg,IDS_DLLHIVER,achDataBuf);
+SetDlgItemText(hDlg,IDS_DESCRIP,(LPCSTR)(stWSAData.szDescription));
+SetDlgItemText(hDlg,IDS_STATUS,(LPCSTR)(stWSAData.szSystemStatus));
+wsprintf(achDataBuf,"MaxSockets: %u",stWSAData.iMaxSockets);
+SetDlgItemText(hDlg,IDS_MAXSOCKS,(LPCSTR)achDataBuf);
+wsprintf(achDataBuf,"iMaxUdp: %u",stWSAData.iMaxUdpDg);
+SetDlgItemText(hDlg,IDS_MAXUDP,(LPCSTR)achDataBuf);
+/*center dialog box*/
+CenterWnd(hDlg,hDlgMain,TRUE);
+return FALSE;
+case WM_COMMAND:
+switch(wParam)
+{
+case IDOK:
+EndDialog(hDlg,0);
+return TRUE;
+}
+break;
+}
+return FALSE;
+} /*end of Dlg_About()*/
+/*Function:-- GetAddr()
+Given a string, it will return an IP address. First, it tries to convert directly. if it fails, it tries to resolve as host name
+*/
+u_long GetAddr(LPSTR,szHost)
+{
+LPHOSTENT lpstHost;
+u_long lAddr=INADDR_ANY;
+/*check if string exists*/
+if(*szHost)
+{
+/*check for a dotted IP address string*/
+lAddr=inet_addr(szHost);
+/*if not an address, then trying to resolve it as host name*/
+if((lAddr==INADDR_NONE) && (_fstrcmp (szHost,"255.255.255.255")))
+{
+lpstHost=gethostbyname(szHost);
+if(lpstHost)
+{
+/*success*/
+lAddr= *((u_long FAR *) (lpstHost->h_addr));
+}
+else
+{
+lAddr=INADDR_ANY; /*failure*/
+}
+}
+}
+return(lAddr);
+} /*end of GetAddr()*/
+/*Function: GetBuf()
+Getting send/receive buffer space as WinSock starts with the amount requested */
+int GetBuf(SOCKET hSock, int nBigBufSize, int nOptval);
+int nRet, nTrySize, nFinalSize=0;
+for(nTrySize=nBigBufSize;nTrySize>MTU_SIZE;nTrySize>>=1)
+{
+nRet=setsockopt(hSock,SOL_SOCKET,nOptval,(char FAR*)&nTrySize,sizeof(int));
+if(nRet==SOCKET_ERROR)
+{
+int WSAErr=WSAGetLastError();
+if((WSAErr==WSAENOPROTOOPT)||(WSAErr==WSAEINVAL))
+break;
+}
+else
+{
+nRet=sizeof(int);
+getsockopt(hSock,SOL_SOCKET,nOptval,(char FAR*)&nFinalSize,&nRet);
+break;
+}
+}
+return(nFinalSize);
+} /*end of GetBuf() */
+/* Function:---- GethostID()
+Getting host IP address using this algorithm:
+~~ Get local host name with gethostname()
+~~ Attempt to resolve local host name with gethostbyname()
+If that fails, then
+~~ Get UDP socket
+~~ Connect UDP socket to arbitrary address and port
+~~ Use getsockname() to get local address
+*/
+LONG GetHostID()
+{
+char szLclHost [MAXHOSTNAME];
+LPHOSTENT lpstHostent;
+SOCKADDR_IN stLclAddr;
+SOCKADDR_IN stRmtAddr;
+int nAddrSize=sizeof(SOCKADDR);
+SOCKET hSock;
+int nRet;
+/*init local address to zero*/
+stLclAddr.sin_addr.s_addr=INADDR_ANY;
+/*get local host name*/
+nRet=gethostname(szLclHost,MAXHOSTNAME);
+if(nRet!=SOCKET_ERROR)
+{
+/*resolve host name for local address*/
+lpstHostent=gethostbyname((LPSTR)szLclHost);
+if(lpstHostent)
+stLclAddr.sin_addr.s_addr= *((u_long FAR*) (lpstHostent->h_addr));
+}
+/*if not yet resolved, then try second strategy*/
+if(stLclAddr.sin_addr.s_addr==INADDR_ANY)
+{
+/*Get UDP socket*/
+hSock=socket(AF_INET,SOCK_DGRAM,0);
+if(hSock!=INVALID_SOCKET)
+{
+/*connect to arbitrary port and address*/
+stRmtAddr.sin_family=AF_INET;
+stRmtAddr.sin_port=htons(IPPORT_ECHO);
+stRmtAddr.sin_addr.s_addr=inet_addr("128.127.50.1");
+nRet=connect(hSock,(LPSOCKADDR)&stRmtAddr,sizeof(SOCKADDR));
+if(nRet!=SOCKET_ERROR)
+{
+/*get local address*/
+getsockname(hSock,(LPSOCKADDR)&stLclAddr,(int FAR*)&nAddrSize);
+}
+closesocket(hSock); /*Woo hoo! Good night socket. */
+}
+}
+return(stLclAddr.sin_addr.s_addr);
+} /*End of GetHostID() */
+/*--Function: GetLclDir()
+Temporary file for later display */
+BOOL GetLclDir(LPSTR szTempFile)
+{
+#ifdef WIN32
+struct _finddata_t stFile; /* Microsoft's 32-bit 'Find' file structure */
+#else
+struct _find_t stFile; /* Microsoft's 16-bit 'Find' file structure */
+#endif
+HFILE hTempFile;
+int nNext;
+hTempFile = CreateLclFile(szTempFile);
+if(hTempFile!=HFILE_ERROR)
+{
+#ifdef WIN32
+nNext =_findfirst("*.*",&stFile);
+while(!nNext)
+{
+wsprintf(achTempBuf,"%-12s %.24s %9ld\n",stFile.name,ctime(&(stFile.time_write)),stFile.size);
+_lwrite(hTempFile,achTempBuf,strlen(achTempBuf));
+nNext= _findnext(nNext, &stFile);
+}
+#else
+nNext= _dos_findfirst("*.*",0,&stFile);
+while(!nNext)
+{
+unsigned month,day,year,hour,second,minute;
+month=(stFile.wr_date>>5) & 0XF;
+day=stFile.wr_date & 0X1F;
+year=((stFile.wr_date>>9) & 0X7F) + 80;
+hour=(stFile.wr_time>>11) & 0X1F;
+minute=(stFile.wr_time>>5) & 0X3F;
+second=(stFile.wr_time & 0X1F) << 1;
+wsprintf(achTempBuf,"%s\t\t%ld bytes \t%d-%d-%d \t%.2d:%.2d:%.2d\r\n",stFile.name,stFile.size,month,day,year,hour,minute,second);
+_lwrite(hTempFile,achTempBuf,strlen(achTempBuf));
+nNext= _dos_findnext(&stFile);
+}
+#endif
+_lclose(hTempFile);
+return(TRUE);
+}
+return(FALSE);
+} /* end of GetLclDir() */
+/*Function: GetPort()
+Returns a port number from a string. It involves converting from ASCII to integer or resolving as service name.
+This function is limited since it assumes the service name that will not begin with an integer where it is possible like we say "Cat on the wall!"
+*/
+u_short GetPort(LPSTR szService)
+{
+u_short nPort=0; /*Port 0 is invalid*/
+LPSERVENT lpServent;
+char c;
+c= *szService;
+if((c>='1') && (c<='9'))
+{
+/*convert ASCII to integer and put in network order*/
+nPort=htons((u_short)atoi (szService));
+}
+else
+{
+/*resolve service name to port number*/
+lpServent=getservbyname((LPSTR)szService,(LPSTR)"tcp");
+if(!lpServent)
+{
+WSAperror(WSAGetLastError( ),"getservbyname( )");
+}
+else
+{
+nPort=lpServent->s_port;
+}
+}
+return(nPort);
+} /*end of GetPort() */
+/*Function: GetWSAErrStr()
+Given a winsock error value, return error string
+*/
+int GetWSAErrStr(int WSAErr, LPSTR lpErrBuf)
+{
+int err_len=0;
+HANDLE hInst;
+HWND hwnd;
+hwnd=GetActiveWindow();
+hInst=GetWindowWord(hwnd,GWW_HINSTANCE);
+if(WSAErr==0)
+WSAErr=WSABASEERR; /*base resource file number*/
+if(WSAErr >= WSABASEERR) /*valid error code*/
+/*get error string in the table from the resource file*/
+err_len=LoadString(hInst,WSAErr,lpErrBuf,ERR_SIZE/2);
+return(err_len);
+} /*end of GetWSAErrStr() */
+/*Function: WSAperror()
+Displays the input parameter string and string description that corresponds to winsock error value input parameter */
+void WSAperror(int WSAErr,LPSTR szFuncName)
+{
+static char achErrBuf[ERR_SIZE]; /*buffer for errors*/
+static char achErrMsg[ERR_SIZE/2];
+WSAErrStr(WSAErr,achErrMsg);
+wsprintf(achErrBuf,"%s failed,%-40c\n\n%s",szFuncName,' ',achErrMsg);
+/*display error message, it doesn't matter whether it's complete or not */
+MessageBox(GetActiveWindow,achErrBuf,"Error",MB_OK | MB_ICONHAND);
+return;
+} /*end of WSAperror() */
