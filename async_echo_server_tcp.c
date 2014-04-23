@@ -613,3 +613,32 @@ break;
 }
 return FALSE;
 } /*end of Dlg_About()*/
+/*Function:-- GetAddr()
+Given a string, it will return an IP address. First, it tries to convert directly. if it fails, it tries to resolve as host name
+*/
+u_long GetAddr(LPSTR,szHost)
+{
+LPHOSTENT lpstHost;
+u_long lAddr=INADDR_ANY;
+/*check if string exists*/
+if(*szHost)
+{
+/*check for a dotted IP address string*/
+lAddr=inet_addr(szHost);
+/*if not an address, then trying to resolve it as host name*/
+if((lAddr==INADDR_NONE) && (_fstrcmp (szHost,"255.255.255.255")))
+{
+lpstHost=gethostbyname(szHost);
+if(lpstHost)
+{
+/*success*/
+lAddr= *((u_long FAR *) (lpstHost->h_addr));
+}
+else
+{
+lAddr=INADDR_ANY; /*failure*/
+}
+}
+}
+return(lAddr);
+} /*end of GetAddr()*/
