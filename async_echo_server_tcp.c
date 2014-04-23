@@ -489,3 +489,87 @@ BOOL CALLBACK Dlg_Main(HWND hDlg, UINT msg, UINT wParam, LPARAM lParam)
 			LocalUnlock(hSock);
 			LocalFree(hSock);
 		} /*end of RemoveConn() */
+/*Function: CenterWnd()
+Center window relative to the parent window */
+void CenterWnd(HWND hWnd, HWND hParentWnd, BOOL bPaint)
+{
+RECT rc2, rc1;
+RECT FAR, *lprc;
+int nWidth, nHeight, cxCenter, cyCenter;
+if(!hParentWnd) /*if we've no parent, then use desktop*/
+hParentWnd=GetDesktopWindow();
+GetWindowRect(hParentWnd,&rc2);
+lprc=(RECT FAR *)&rc2;
+cXCenter=lprc->left+((lprc->right-lprc->left)/2);
+cyCenter=lprc->top+((lprc->bottom-lprc->top)/2);
+MoveWindow(hWnd, cXCenter-(nWidtth/2), cyCenter-(nHeight/2), nWidth, nHeight, bPaint);
+return;
+} /*end of CenterWnd() */
+/*Function: CloseConn()
+Closing TCP connection, ensuring that no data loss can occur on WInSocks that post FD_CLOSE when data is still available to read
+*/
+int CloseConn(SOCKET hSock, LPSTR achInBuf, int len, HWND hWnd)
+{
+int nRet;
+char achDiscard(BUF_SIZE);
+int cbBytesToDo=len, cbBytesDone=0;
+if(hSock!=INVALID_SOCKET)
+{
+/*disable asynchronous notification if window handle is provided*/
+if(hWnd)
+{
+nRet=WSAAsyncSelect(hSock, hWnd, 0, 0);
+if(nRet==SOCKET_ERROR)
+WSAperror(WSAGetLastError(),"CloseConn() WSAAsyncSelect()");
+}
+/*half-closing the connecting*/
+nRet=shutdown(hSock,l);
+/*read remaining data*/
+for(nRet=1;(nRet && (nRet!=SOCKET_ERROR));)
+{
+if(achInBuf)
+{
+nRet=recv(hSock,&achInBuf[cbBytesDone],cbBytesToDo,0);
+if(nRet && (nRet!=SOCKET_ERROR))
+{
+cbBytesToDo-=nRet;
+cbBytesDone+=nRet;
+}
+}
+else
+{
+/*no buffer provided, so discard any data*/
+nRet=recv(hSock,achDiscard,BUF_SIZE,0);
+}
+}
+/*closing the socket*/
+closesocket(hSock);
+}
+return(nRet);
+} /*end of CloseConn()*/
+/*Function: CreateLclFile()
+Try to create a file on local system and notify user if fails and then prompt for new file name*/
+HFILE CreateLclFile(LPSTR szFileName)
+{
+HFILE hFile;
+char szRmtFile(MAXFILENAME);
+hFile= _lcreat (szFileName, 0); /*creating the file*/
+strcpy(szRmtFile,szFileName); /*save remote file name*/
+while(hFile==HFILE_ERROR)
+{
+wsprintf(achTempBuf,"Unable to create the file %s, Change the file name", szFileName);
+MessageBox(hWinMain,achTempBuf,"File Error",MB_OK | MB_ICONASTERISK);
+if(!DialogBox(hInst,MAKEINTRESOURCE(IDD_FILENAME),hWinMain,Dlg_File))
+{
+/*no new file name is provided, so quit*/
+break;
+}
+else
+{
+/*try creating a new file*/
+hFile= _lcreat(szFileName, 0);
+}
+}
+strcpy(szFileName,szRmtFile); /*replace remote filename*/
+return hFile;
+} /*end of CreateLclFile() */
