@@ -758,3 +758,105 @@ return(TRUE);
 }
 return(FALSE);
 } /* end of GetLclDir() */
+/*--Function: GetLclDir()
+Temporary file for later display */
+BOOL GetLclDir(LPSTR szTempFile)
+{
+#ifdef WIN32
+struct _finddata_t stFile; /* Microsoft's 32-bit 'Find' file structure */
+#else
+struct _find_t stFile; /* Microsoft's 16-bit 'Find' file structure */
+#endif
+HFILE hTempFile;
+int nNext;
+hTempFile = CreateLclFile(szTempFile);
+if(hTempFile!=HFILE_ERROR)
+{
+#ifdef WIN32
+nNext =_findfirst("*.*",&stFile);
+while(!nNext)
+{
+wsprintf(achTempBuf,"%-12s %.24s %9ld\n",stFile.name,ctime(&(stFile.time_write)),stFile.size);
+_lwrite(hTempFile,achTempBuf,strlen(achTempBuf));
+nNext= _findnext(nNext, &stFile);
+}
+#else
+nNext= _dos_findfirst("*.*",0,&stFile);
+while(!nNext)
+{
+unsigned month,day,year,hour,second,minute;
+month=(stFile.wr_date>>5) & 0XF;
+day=stFile.wr_date & 0X1F;
+year=((stFile.wr_date>>9) & 0X7F) + 80;
+hour=(stFile.wr_time>>11) & 0X1F;
+minute=(stFile.wr_time>>5) & 0X3F;
+second=(stFile.wr_time & 0X1F) << 1;
+wsprintf(achTempBuf,"%s\t\t%ld bytes \t%d-%d-%d \t%.2d:%.2d:%.2d\r\n",stFile.name,stFile.size,month,day,year,hour,minute,second);
+_lwrite(hTempFile,achTempBuf,strlen(achTempBuf));
+nNext= _dos_findnext(&stFile);
+}
+#endif
+_lclose(hTempFile);
+return(TRUE);
+}
+return(FALSE);
+} /* end of GetLclDir() */
+/*Function: GetPort()
+Returns a port number from a string. It involves converting from ASCII to integer or resolving as service name.
+This function is limited since it assumes the service name that will not begin with an integer where it is possible like we say "Cat on the wall!"
+*/
+u_short GetPort(LPSTR szService)
+{
+u_short nPort=0; /*Port 0 is invalid*/
+LPSERVENT lpServent;
+char c;
+c= *szService;
+if((c>='1') && (c<='9'))
+{
+/*convert ASCII to integer and put in network order*/
+nPort=htons((u_short)atoi (szService));
+}
+else
+{
+/*resolve service name to port number*/
+lpServent=getservbyname((LPSTR)szService,(LPSTR)"tcp");
+if(!lpServent)
+{
+WSAperror(WSAGetLastError( ),"getservbyname( )");
+}
+else
+{
+nPort=lpServent->s_port;
+}
+}
+return(nPort);
+} /*end of GetPort() */
+/*Function: GetWSAErrStr()
+Given a winsock error value, return error string
+*/
+int GetWSAErrStr(int WSAErr, LPSTR lpErrBuf)
+{
+int err_len=0;
+HANDLE hInst;
+HWND hwnd;
+hwnd=GetActiveWindow();
+hInst=GetWindowWord(hwnd,GWW_HINSTANCE);
+if(WSAErr==0)
+WSAErr=WSABASEERR; /*base resource file number*/
+if(WSAErr >= WSABASEERR) /*valid error code*/
+/*get error string in the table from the resource file*/
+err_len=LoadString(hInst,WSAErr,lpErrBuf,ERR_SIZE/2);
+return(err_len);
+} /*end of GetWSAErrStr() */
+/*Function: WSAperror()
+Displays the input parameter string and string description that corresponds to winsock error value input parameter */
+void WSAperror(int WSAErr,LPSTR szFuncName)
+{
+static char achErrBuf[ERR_SIZE]; /*buffer for errors*/
+static char achErrMsg[ERR_SIZE/2];
+WSAErrStr(WSAErr,achErrMsg);
+wsprintf(achErrBuf,"%s failed,%-40c\n\n%s",szFuncName,' ',achErrMsg);
+/*display error message, it doesn't matter whether it's complete or not */
+MessageBox(GetActiveWindow,achErrBuf,"Error",MB_OK | MB_ICONHAND);
+return;
+} /*end of WSAperror() */
