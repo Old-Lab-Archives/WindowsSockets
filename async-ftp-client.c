@@ -212,3 +212,120 @@ BOOL CALLBACK Dlg_Main(HWND hDlg,UINT msg,UINT wParam,LPARAM lParam)
 				break;
 			} /*end of switch(WSAEvent) */
 			break;
+			case WM_COMMAND:
+			switch(wParam)
+			{
+			case IDC_CONNECT:
+				/*if we already have a socket, then tell user to close it*/
+				if(nAppState & CTRLCONNECTED)
+				{
+					MessageBox(hDlg,"close the active connection first","unable to connect",MB_OK | MB_ICONASTERISK);
+				}
+				else
+				{
+					/*prompt user for server and login user information*/
+					bOk=DialogBox(hInst,MAKEINTRESOURCE(IDD_SERVER),hDlg,Dlg_Login);
+					if(bOk)
+					{
+						/*check destination address and resolve if necessary*/
+						stCRmtName.sin_addr.s_addr=GetAddr(szHost);
+						if(stCRmtName.sin_addr.s_addr==INADDR_ANY)
+						{
+							/*tell user to enter an host*/
+							wsprintf(achTempBuf,"Sorry. server %s is invalid. Try again!",szHost);
+							MessageBox(hDlg,achTempBuf,"unable to connect!", MB_OK | MB_ICONASTERISK);
+						}
+						else
+						{
+							/*initialize connect attempt to server*/
+							hCtrlSock=InitCtrlConn(&stCRmtName,hDlg,WSA_ASYNC);
+						}
+					}
+				}
+				break;
+			case IDC_CLOSE:
+				if(nAppState & CTRLCONNECTED)
+				{
+					/*set application state, so nothing else is processed.*/
+					nAppState=NOT_CONNECTED;
+					if(hLstn!=INVALID_SOCKET)
+					{
+						closesocket(hLstnSock);
+						hLstnSock=INVALID_SOCKET;
+					}
+					/*if there is data connection, then abort it*/
+					if(hDataSock!=INVALID_SOCKET)
+						QueueFtpCmd(ABOR,0);
+					/*quit the control connection*/
+					if(hCtrlSock!=INVALID_SOCKET)
+						QueueFtpCmd(QUIT,0);
+					SetDlgItemText(hDlg,IDC_SERVER,"Server: None");
+					SetDlgItemText(hDlg,IDC_STATUS,"Status: Not connected");
+				}
+				break;
+			case IDC_RETR:
+				/*prompt for name of remote file to get*/
+				if(nAppState & CTRLCONNECTED)
+				{
+					bOk=DialogBox(hInst,MAKEINTRESOURCE(IDD_FILENAME),hDlg,Dlg_File);
+					if(bOk && szDataFile[0])
+					{
+						if(!bToNul)
+						{
+							hDatafile=CreateLclFile(szDataFile);
+						}
+						if(hDataFile!=HFILE_ERROR || bToNul)
+						{
+							/*tell the server where to connect back*/
+							hLstnSock=InitDataConn(&stDLclName,hDlg,WSA_ASYNC + 1);
+							if(hLstnSock!=INVALID_SOCKET)
+							{
+								/*Queue port. type and Retr cmd */
+								if(QueueFtpCmd(PORT,0))
+								{
+									if(QueueFtpCmd(TYPE,"I"))
+										QueueFtpCmd(RETR,szDataFile);
+								}
+							}
+						}
+					}
+				}
+				else
+					not_connected();
+				break;
+			case IDC_STOR:
+				/*prompt for name of the local file to send*/
+				if(nAppState & CTRLCONNECTED)
+				{
+					bOk=DialogBox(hInst,MAKEINTRESOURCE(IDD_FILENAME),hDlg,Dlg_File);
+					if(bOk && szDataFile[0])
+					{
+						if(!bFromNul)
+						{
+							/*if user provided file name, try to open it*/
+							hDataFile= _lopen(szDataFile, 0);
+							if(hDataFile==HFILE_ERROR)
+							{
+								wsprintf(achTempBuf,"Unable to open file: %s",szDataFile);
+								MessageBox(hWinMain,(LPSTR)achTempBuf,"File error", MB_OK | MB_ICONASTERISK);
+							}
+						}
+						if(hDataFile!=HFILE_ERROR || bFromNul)
+						{
+							/*tell server where to connect back*/
+							hLstnSock=InitDataConn(&stDLclName,hDlg,WSA_ASYNC + 1);
+							if(hLstnSock!=INVALID_SOCKET)
+							{
+								/*queue port,type and STOR cmds*/
+								if(QueueFtpCmd(PORT,0))
+								{
+									if(QueueFtpCmd(TYPE,"I"))
+										QueueFtpCmd(STOR,szDataFile);
+								}
+							}
+						}
+					}
+				}
+				else
+					not_connected();
+				break;
