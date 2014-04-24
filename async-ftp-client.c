@@ -459,3 +459,66 @@ case IDC_RDEL:
 							} /*end of switch(msg)*/
 							return(bRet);
 							} /*end of DlgMain()*/
+/*Function: Dlg_Options()
+Allow user to change a number of run-time parameters that affect the operation, to allow experimentation & debugging.
+*/
+BOOL CALLBACK Dlg_Options(HWND hDlg,UINT msg,UINT wParam,LPARAM lParam)
+{
+	BOOL bRet=FALSE;
+	lParam=lParam; /*avoid warning*/
+	switch(msg)
+	{
+	case WM_INITDIALOG:
+		CheckDlgButton(hDlg,IDC_TO_NUL,bToNul);
+		CheckDlgButton(hDlg,IDC_FROM_NUL,bFromNul);
+		CheckDlgButton(hDlg,IDC_LOGFILE,bLogFile);
+		CheckDlgButton(hDlg,IDC_IOBEEP,bIOBeep);
+		CheckDlgButton(hDlg,IDC_REASYNC,bReAsync);
+		CenterWnd(hDlg,hWinMain,TRUE);
+		break;
+	case WM_COMMAND:
+		switch(wParam)
+		{
+		case IDC_TO_NUL:
+			bToNul=!bToNul;
+			break;
+		case IDC_FROM_NUL:
+			bFromNul=!bFromNul;
+			break;
+		case IDC_LOGFILE:
+			bLogFile=!bLogFile;
+			break;
+		case IDC_IOBEEP:
+			bIOBeep=!bIOBeep;
+			break;
+		case IDC_REASYNC:
+			bReAsync=!bReAsync;
+			break;
+		case IDOK:
+			if(bLogFile && hLogFile == HFILE_ERROR)
+			{
+				bLogFile=FALSE;
+		}
+			else if(!bLogFile && hLogFile == HFILE_ERROR)
+			{
+				hLogFile= _lcreat(szLogFile,0);
+				if(hLogFile==HFILE_ERROR)
+				{
+					MessageBox(hWinMain,"unable to open log file","file error",MB_OK | MB_ICONASTERISK);
+					bLogFile=FALSE;
+				}
+			}
+			EndDialog(hDlg,TRUE);
+			bRet=TRUE;
+			break;
+		}
+	}
+	return(bRet);
+} /*end of Dlg_Options*/
+/*Function:- not_connected()
+tell the user that the client needs a connection
+*/
+void not_connected(void)
+{
+	MessageBox(hDlgMain,"Requires connection to FTP server","not connected",MB_OK | MB_ICONASTERISK);
+}
