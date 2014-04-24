@@ -147,3 +147,68 @@ BOOL CALLBACK Dlg_Main(HWND hDlg,UINT msg,UINT wParam,LPARAM lParam)
 				break;
 			} /*end of switch(WSAEvent) */
 				break;
+			case WSA_ASYNC:
+			/*control socket async notification message handlers*/
+			WSAEvent=WSAGETSELECTEVENT(lParam); /*extract event*/
+			WSAErr=WSAGETSELECTERROR(lParam); /*extract error*/
+			if(WSAErr)
+			{
+				/*if error, then display*/
+				int i,j;
+				for(i=0;j=WSAEVENT;j;i++;j>>=1); /*convert bit into index*/
+				WSAperror(WSAErr,aszWSAEvent[i]);
+			}
+			hSock=(SOCKET)wParam;
+			switch(WSAEvent)
+			{
+			case FD_READ:
+				if(!iNextRply)
+				{
+					/*receive reply from server*/
+					iLastRply=RecvFtpRply(hCtrlSock,szFtpRply,RPLY_SIZE);
+				}
+				if(iLastRply && (iLastRply!=SOCKET_ERROR))
+				{
+					/*display the reply message*/
+					GetDlgItemText(hWinMain,IDC_REPLY,achRplyBuf,RPLY_SIZE-strlen(szFtpRply));
+					wsprintf(achTempBuf,"%s%s",stFtpRply,achRplyBuf);
+					SetDlgItemText(hWinMain,IDC_REPLY,achTempBuf);
+					/*save index to next reply*/
+					nRet=strlen(szFtpRply);
+					if(iLastRply > nRet+2)
+					{
+						iNextRply=nRet+3;
+						if(szFtpRply[nRet+2])
+						iNextRply=nRet+2;
+					}
+				}
+				/*reply based on last command*/
+				ProcessFtpRply(szFtpRply,RPLY_SIZE);
+				break;
+			case FD_WRITE:
+				/*send command to server*/
+				if(aszFtpCmd[1].nFtpCmd)
+					SendFtpCmd();
+				break;
+			case FD_CONNECT:
+				/*control connected at TCP level*/
+				nAppState=CTRLCONNECTED;
+				wsprintf(achTempBuf,"Server: %s", szHost);
+				SetDlgItemText(hDlg,IDC_SERVER,achTempBuf);
+				SetDlgItemText(hDlg,IDC_STATUS,"Status: connected");
+				break;
+			case FD_CLOSE:
+				if(nAppState & CTRLCONNECTED)
+				{
+					nAppState=NOT_CONNECTED; /*reset app status*/
+					AbortFtpCmd();
+					if(hCtrlSock!=INVALID_SOCKET) /*close control socket*/
+						CloseConn(&hCtrlSock, (PSTR)0, 0, hDlg);
+					SetDlgItemText(hDlg,IDC_SERVER,"server: none");
+					SetDlgItemText(hDlg,IDC_STATUS,"Status: not connected");
+				}
+				break;
+			default:
+				break;
+			} /*end of switch(WSAEvent) */
+			break;
