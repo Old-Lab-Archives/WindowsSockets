@@ -329,3 +329,51 @@ BOOL CALLBACK Dlg_Main(HWND hDlg,UINT msg,UINT wParam,LPARAM lParam)
 				else
 					not_connected();
 				break;
+			case IDC_ABOR:
+				if(hCtrlSock!=INVALID_SOCKET)
+					/*abort the pending FTP command*/
+					QueueFtpCmd(ABOR,0);
+				break;
+			case IDC_LCWD:
+				/*prompt for directory and move to it on local system*/
+				bOk=DialogBox(hInst,MAKEINTRESOURCE(IDD_FILENAME),hDlg,Dlg_File);
+				if(bOk && aszDataFile[0])
+				{
+					if(!(_chdir(szDataFile)))
+					{
+						getcwd(szDataFile,MAXFILENAME-1);
+						SetDlgItemText(hDlg,IDC_LPWD,szDataFile);
+					}
+				}
+				break;
+			case IDC_LDEL:
+				/*prompt for file name and delete it from local system*/
+				bOk=DialogBox(hInst,MAKEINTRESOURCE(IDD_FILENAME),hDlg,Dlg_File);
+				if(bOk && szDataFile[0])
+				{
+					/*if user provided file name, then delete it*/
+					remove(szDataFile);
+				}
+				break;
+			case IDC_LDIR:
+				/*get local file directory and display in notepad*/
+				if(GetLclDir(szTempFile))
+				{
+					wsprintf(achTempBuf,"notepad %s",szTempFile);
+					WinExec(achTempBuf,SW_SHOW);
+				}
+				break;
+			case IDC_RCWD:
+				/*prompt for directory and move to it on remote system*/
+				if(nAppState & CTRLCONNECTED)
+				{
+					szDataFile[0]=0;
+					bOk=DialogBox(hInst,MAKEINTRESOURCE(IDD_FILENAME),hDlg,Dlg_File);
+					if(bOk && szDataFile[0])
+					{
+						QueueFtpCmd(CWD,szDataFile);
+					}
+				}
+				else
+					not_connected();
+				break;
