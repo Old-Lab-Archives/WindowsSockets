@@ -377,3 +377,85 @@ BOOL CALLBACK Dlg_Main(HWND hDlg,UINT msg,UINT wParam,LPARAM lParam)
 				else
 					not_connected();
 				break;
+case IDC_RDEL:
+				/*prompt for file name and delete it from remote system*/
+				if(nAppState & CTRLCONNECTED)
+				{
+					szDataFile[0]=0;
+					bOk=DialogBox(hInst,MAKEINTRESOURCE(IDD_FILENAME),hDlg,Dlg_File);
+					if(bOk && szDataFile[0])
+					{
+						/*if user provided file name, send command to delete*/
+						QueueFtpCmd(DELE,szDataFile);
+					}
+				}
+				else
+					not_connected();
+				break;
+			case IDC_RDIR:
+				/*get remote file directory and display in notepad*/
+				if(nAppState & CTRLCONNECTED)
+				{
+					hDataFile=CreateLclFile(szTempFile);
+					if(hDataFile!=HFILE_ERROR)
+					{
+						/*prepare to receive connection from server*/
+						hLstnSock=InitDataConn(&stDLclName,hDlg,WSA_ASYNC + 1);
+						if(QueueFtpCmd(PORT,0))
+							if(QueueFtpCmd(TYPE,"A"))
+								QueueFtpCmd(LIST,0);
+					}
+				}
+				}
+				else
+					not_connected;
+					break;
+					case IDC_OPTIONS:
+						DialogBox(hInst,MAKEINTRESOURCE(IDD_OPTIONS),hDlg,Dlg_Options);
+						break;
+					case IDABOUT:
+						DialogBox(hInst,MAKEINTRESOURCE(IDD_ABOUT),hDlg,hDlg_About);
+						break;
+					case WM_DESTROY:
+					case IDC_EXIT:
+						SendMessage(hDlg,WM_COMMAND. IDC_CLOSE, 0L);
+						if(hLogFile!=HFILE_ERROR)
+							_lclose(hLogFile);
+						EndDialog(hDlg,msg);
+						bRet=TRUE;
+						break;
+					default:
+						break;
+						} /*end of case WM_COMMAND */
+						break;
+						case WM_INITDIALOG:
+							hWinMain=hDlg; /*save main window handle*/
+							/*assign an icon to dialog box*/
+#ifdef WIN32
+							SetClassLong(hDlg,GCL_HICON,(LONG) LoadIcon((HINSTANCE) GetWindowLong(hDlg, GWL_HINSTANCE), __TEXT("AC_FTP")));
+#else
+							SetClassWord(hDlg,GCW_HICON,(WORD) LoadIcon(hInst,MAKEINTRESOURCE(AC_FTP)));
+#endif
+							/*initialize FTP command structure*/
+							memset(astFtpCmd,0,(sizeof(struct stFtpCmd)) *MAX_CMDS);
+							/*display current working directory*/
+							getcwd(szDataFile,MAXFILENAME-1);
+							SetDlgItemSet(hDlg,IDC_LPWD,szDataFile);
+							/*open log file, if logging enabled*/
+							if(bLogFile)
+							{
+								hLogFile= _lcreat (szLogFile,0);
+								if(hLogFile==HFILE_ERROR)
+								{
+									MessageBox(hWinMain,"unable to open log file","file error",MB_OK | MB_ICONASTERISK);
+									bLogFile=FALSE;
+								}
+							}
+							/*center dialog box*/
+							CenterWnd(hDlg,NULL,TRUE);
+							break;
+						default:
+							break;
+							} /*end of switch(msg)*/
+							return(bRet);
+							} /*end of DlgMain()*/
