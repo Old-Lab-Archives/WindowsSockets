@@ -565,3 +565,110 @@ SOCKET InitCtrlConn(PSOCKADDR_IN pstName, HWND hDlg, u_int nAsyncMsg)
 	}
 	return(hCtrlSock);
 } /*end of InitCtrlConn()*/
+/*--Function:- SendFtpCmd()
+Format and send a FTP command to the server */
+int SendFtpCmd(void)
+{
+	int nRet,nLen,nBytesSent=0;
+	int nFtpCmd=astFtpCmd[1].nFtpCmd;
+	/*create a command string*/
+	if(szFtpCmd[0]==0)
+	{
+		switch(nFtpCmd)
+		{
+		case PORT:
+			wsprintf(szFtpCmd,"PORT %d,%d,%d,%d,%d,%d \r\n",
+				stDlclName.sin_addr.S_un.S_un_b.s_b1,/*local addr*/
+				stDlclName.sin_addr.S_un.S_un_b.s_b2,
+				stDlclName.sin_addr.S_un.S_un_b.s_b3,
+				stDlclName.sin_addr.S_un.S_un_b.s_b4,
+				stDlclName.sin_port & 0XFF, /*local port*/
+				(stDlclName.sin_port & 0XFF00)>>8);
+			break;
+		case CWD:
+		case DELE:
+		case PASS:
+		case RETR:
+		case STOR:
+		case TYPE:
+		case USER:
+			/*FTP command and parameter*/
+			wsprintf(szFtpCmd,"%s%s\r\n",aszFtpCmd[nFtpCmd],&(astFtpCmd[1].szFtpParm));
+			break;
+		case ABOR:
+		case LIST:
+		case PWD:
+		case QUIT:
+			/*solitary FTP command string (no parameters)*/
+			wsprintf(szFtpCmd,"%s\r\n",aszFtpCmd[nFtpCmd]);
+			break;
+		default:
+			return(0);
+		}
+	}
+	nLen=strlen(szFtpCmd);
+	if(hCtrlSock!=INVALID_SOCKET)
+	{
+		/*send FTP command to control socket*/
+		while(nBytesSent < nLen)
+		{
+			nRet=send(hCtrlSock,(LPSTR)szFtpCmd,nLen-nBytesSent,0);
+			if(nRet==SOCKET_ERROR)
+			{
+				int WSAErr=WSAGetLastError();
+				if(WSAErr!=WSAEWOULDBLOCK)
+					WSAperror(WSAErr,"SendFtpCmd()");
+				break;
+			}
+			nBytesSent+=nRet;
+		}
+	}
+	if(nBytes==nLen)
+	{
+		int i;
+		if(nFtpCmd==PASS) /*hide password*/
+			memset(szFtpCmd+5,'x',10);
+		if(bLogFile) /*log command*/
+			_lwrite(hLogFile,szFtpCmd,strlen(szFtpCmd));
+		GetDlgItemText(hWinMain,IDC_REPLY,/*display command*/ achRplyBuf,"%s%s",szFtpCmd,achRplyBuf);
+		SetDlgItemText(hWinMain,IDC_REPLY,achTempBuf);
+		szFtpCmd[0]=0; /*disable FTP command string*/
+		/*move everything up in the command queue*/
+		for(i=0;i<nQLen;i++)
+		{
+			astFtpCmd[i].nFtpCmd=astFtpCmd[i+1].nFtpCmd;
+			astFtp[i+1].nFtpCmd=0; /*reset old command*/
+			if(*(astFtpCmd[i+1].szFtpParm))
+			{
+				memcpy(astFtpCmd[i].szFtpParm,astFtpCmd[i+1].szFtpParm,CMD_SIZE);
+				*(astFtpCmd[i+1].szFtpParm)=0; /*terminate old string*/
+			}
+			else
+			{
+				*(astFtpCmd[i].szFtpParm)=0; /*terminate unused string*/
+			}
+		}
+		nQLen--; /*decrement the queue length*/
+		switch(nFtpCmd)
+		{
+		case(USER):
+			SetDlgItemText(hWinMain,IDC_STATUS,"Status:connecting");
+			break;
+		case(STOR):
+			SetDlgItemText(hWinMain,IDC_STATUS,"Status:sending a file");
+			break;
+		case(RETR):
+			SetDlgItemText(hWinMain,IDC_STATUS,"Status:receiving a file");
+			break;
+		case(LIST):
+			SetDlgItemText(hWinMain,IDC_STATUS,"Status:Receiving directory");
+			break;
+		case(QUIT):
+			SetDlgItemText(hWinMain,IDC_STATUS,"Server:None");
+			SetDlgItemText(hWinMain,IDC_STATUS,"Status:Not connected");
+			break;
+		}
+	}
+	return(nBytesSent);
+	} /*end of SendFtpCmd()*/
+	
