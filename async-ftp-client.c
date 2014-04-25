@@ -698,4 +698,24 @@ int SendFtpCmd(void)
 		}
 		return(TRUE); /*queued!*/
 	} /*end of QueueFtpCmd() */
-	
+	/*--Function: AbortFtpCmd()
+	Clean up routine to abort a pending FTP command and clear the command queue*/
+	void AbortFtpCmd(void)
+	{
+		int i;
+		if(hLstnSock!=INVALID_SOCKET)
+			/*closing the listen socket*/
+			closesocket(hLstnSock);
+		hLstnSock=INVALID_SOCKET;
+	}
+	if(hDataSock!=INVALID_SOCKET)
+		/*closing data socket*/
+		CloseConn(&hDataSock,(astFtpCmd[0].nFtpCmd!=STOR) ? achInBuf : (PSTR)0, INPUT_SIZE, hWinMain);
+	EndData();
+	}
+	for(i=0;i<MAX_CMDS;i++)
+	{
+		/*clear command queue*/
+		astFtpCmd[i].nFtpCmd=0;
+		nQLen=0;
+	} /*end of AbortFtpCmd()*/
