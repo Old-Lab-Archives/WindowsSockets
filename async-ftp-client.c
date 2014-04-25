@@ -522,3 +522,46 @@ void not_connected(void)
 {
 	MessageBox(hDlgMain,"Requires connection to FTP server","not connected",MB_OK | MB_ICONASTERISK);
 }
+/* Function: InitCtrlConn()
+Get a TCP socket, register for async notification and then, connect to FTP  server*/
+SOCKET InitCtrlConn(PSOCKADDR_IN pstName, HWND hDlg, u_int nAsyncMsg)
+{
+	int nRet;
+	SOCKET hCtrlSock;
+	/*get TCP socket for control connection*/
+	hCtrlSock=socket(AF_INET,SOCK_STREAM,0);
+	if(hCtrlSock==INVALID_SOCKET)
+	{
+		WSAperror(WSAGetLastError(),"socket()");
+	}
+	else
+	{
+		/*request async notifications for most events*/
+		nRet=WSAAsyncSelect(hCtrlSock,hDlg,nAsyncMsg,(FD_CONNECT | FD_READ | FD_WRITE | FD_CLOSE));
+		if(nRet==SOCKET_ERROR)
+		{
+			WSAperror(WSAGetLastError(),"WSAAsyncSelect()");
+			closesocket(hCtrlSock);
+			hCtrlSock=INVALID_SOCKET;
+		}
+		else
+		{
+			/*initiate non-blocking connect to server*/
+			pstName->sin_family=PF_INET;
+			pstName->sin_port=htons(IPPORT_FTP);
+			nRet=connect(hCtrlSock,(LPSOCKADDR)pstName,SOCKADDR_LEN);
+			if(nRet==SOCKET_ERROR)
+			{
+				int WSAErr=WSAGetLastError();
+				if(WSAErr!=WSAEWOULDBLOCK)
+				{
+					/*report error and clean up*/
+					WSAperror(WSAErr,"connect()");
+					closesocket(hCtrlSock);
+					hCtrlSock=INVALID_SOCKET;
+				}
+			}
+		}
+	}
+	return(hCtrlSock);
+} /*end of InitCtrlConn()*/
