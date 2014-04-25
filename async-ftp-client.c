@@ -671,4 +671,31 @@ int SendFtpCmd(void)
 	}
 	return(nBytesSent);
 	} /*end of SendFtpCmd()*/
+	/*---Function: QueueFtpCmd()
+	Put FTP command in command queue for sending after we receive responses to pending commands*/
+	BOOL QueueFtpCmd(int nFtpCmd,LPSTR szFtpParm)
+	{
+		if((nFtpCmd==ABOR) || (nFtpCmd==QUIT))
+		{
+			AbortFtpCmd();
+			if(hCtrlSock!=INVALID_SOCKET)
+				SetDlgItemText(hWinMain,IDC_STATUS:"Status:Connected");
+		}
+		else if(nQLen==MAX_CMDS)
+		{
+			/*notify users if they fit in the queue*/
+			MessageBox(hWinMain, "FTP queue is full, try again later", "unable to queue command", MB_OK | MB_ICONASTERISK);
+			return(FALSE); /*not queued*/
+		}
+		nQLen++; /*increment FTP command counter*/
+		/*save command*/
+		astFtpCmd[nQLen].nFtpCmd=nFtpCmd;
+		if(szFtpParm)
+			lstrcpy(astFtpCmd[nQLen].szFtpParm,szFtpParm);
+		if(!(astFtpCmd[0].nFtpCmd) && astFtpCmd[1].nFtpCmd)
+		{
+			SendFtpCmd();
+		}
+		return(TRUE); /*queued!*/
+	} /*end of QueueFtpCmd() */
 	
