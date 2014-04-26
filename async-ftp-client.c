@@ -1337,3 +1337,58 @@ long SendData(SOCKET *hDataSock, HFILE hDataFile, int len)
 			while(nRet!=SOCKET_ERROR);
 			return(cbTotalSent);
 }/*end of SendData()*/
+/*--- Function: RecvData()
+Receive data from net and write to open the data file */
+int RecvData(SOCKET hDataSock,HFILE hDataFile,LPSTR achInBuf,int len)
+{
+	static HFILE hLastFile; /*handle of last file sent*/
+	static int cbBytesBuffered; /*total bytes received*/
+	int cbBytesRcvd=0;
+	int nRet=0, WSAErr;
+	if(hDataFile!=hLastFile)
+	{
+		hLastFile=hDataFile;
+		cbBytesBuffered=0;
+	}
+	/*read from server*/
+	while(cbBytesBuffered<len)
+	{
+		nRet=recv(hDataSock,&(achInBuf[cbBytesBuffered]),len-cbBytesBuffered,0);
+		if(nRet==SOCKET_ERROR)
+		{
+			WSAErr=WSAGetLastError();
+			/*display significant errors*/
+			if(WSAErr!=WSAEWOULDBLOCK)
+				WSAperror(WSAErr,(LPSTR)"recv()");
+			/*exit recv() loop on any error*/
+			goto recv_end;
+		}
+		else if(nRet==0)
+		{
+			/*other side closed socket*/
+			/*quit if server closed connection*/
+			goto recv_end;
+		}
+		else
+		{
+			/*update byte counter and display*/
+			lByteCOunt+=nRet;
+			_ltoa(lByteCount,achTempBuf,10);
+			SetDlgItemText(hWinMain,IDC_DATA_RATE,achTempBuf);
+			cbBytesRcvd+=nRet; /*tally bytes read*/
+			cbBytesBuffered+=nRet;
+		}
+	}
+recv_end:
+	if(!bToNul && ((cbBytesBuffered > (len-MTU_SIZE)) || ((nRet==SOCKET_ERROR) && WSAGetLastError()!=WSAEWOULDBLOCK)||(nRet==0)))
+	{
+		/*if over-buffer occurs, then write to data file*/
+		nRet= _lwrite(hDataFile,achInBuf,cbBytesBuffered);
+		if(nRet==HFILE_ERROR)
+			MessageBox(hWinMain,"unable to write local file", "RecvData( ) Failed", MB_OK | MB_ICONASTERISK);
+		cbBytesBuffered=0;
+	}
+	else if(bToNul)
+		cbBytesBuffered=0;
+	return(cbBytesRcvd);
+} /*end of RecvData() */
