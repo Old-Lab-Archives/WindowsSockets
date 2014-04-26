@@ -719,3 +719,26 @@ int SendFtpCmd(void)
 		astFtpCmd[i].nFtpCmd=0;
 		nQLen=0;
 	} /*end of AbortFtpCmd()*/
+/*--Function: RecvFtpRply()
+	Read the FTP reply from the server */
+	int RecvFtpRply(SOCKET hCtrlSock, LPSTR szFtpRply, int nLen)
+	{
+		int nRet=0;
+		if(hCtrlSock!=INVALID_SOCKET)
+		{
+			memset(szFtpRply,0,nLen); /*init receive buffer*/
+			/*reading*/
+			nRet=recv(hCtrlSock,(LPSTR)szFtpRply,nLen,0);
+			if(nRet==SOCKET_ERROR)
+			{
+				int WSAErr=WSAGetLastError();
+				if(WSAErr!=WSAEWOULDBLOCK)
+				{
+					WSAperror(WSAErr,"RecvFtpRply()");
+				}
+			}
+			else if(bLogFile) /*log reply*/
+				_lwrite(hLogFile,szFtpRply,nRet);
+		}
+		return(nRet);
+	} /*end of RecvFtpRply()*/
