@@ -1392,3 +1392,69 @@ recv_end:
 		cbBytesBuffered=0;
 	return(cbBytesRcvd);
 } /*end of RecvData() */
+/*Function:-- EndData()
+Close the data connection */
+void EndData(void)
+{
+	LONG dByteRate;
+	LONG lMSecs;
+	/*calculate data transfer rate and display*/
+	lMSecs=(LONG) GetTickCount() - lStartTime;
+	if(lMSecs <= 55)
+		lMSecs=27; /*about half of 55Msec PC clock resolution*/
+	/*socket check not neccessary, but some WinSocks may post FD_CLOSE to listen socket after close*/
+	nAppState&=~(DATACONNECTED);
+	SetDlgItemText(hWinMain,IDC_STATUS,"Status:connected");
+	if(lByteCount>0L)
+	{
+		dByteRate=(lByteCount/lMSecs); /*data rate*/
+		wsprintf(achTempBuf,"%ld bytes %s in %ld.%ld seconds (%ld.%ld KBytes/sec)",lByteCount,((astFtpCmd[0].nFtpCmd==STOR) ? "sent":"received"),lMSecs/1000,lMSecs%1000,(dByteRate*1000)/1024,(dByteRate*1000)%1024);
+		SetDlgItemText(hWinMain,IDC_DATA_RATE,achTempBuf);
+		if(hLogFile!=HFILE_ERROR)
+			_lwrite=(hLogFile,achTempBuf,strlen(achTempBuf));
+	}
+	lStartTime=0L;
+	if(hDataFile!=HFILE_ERROR)
+	{
+		_lclose(hDataFile);
+		hDataFile=HFILE_ERROR;
+		if(astFtpCmd[0].nFtpCmd==LIST)
+		{
+			wsprintf(achTempBuf,"notepad %s",szTempFile);
+			WinExec(achTempBuf,SW_SHOW);
+		}
+	}
+	astFtpCmd[0].nFtpCmd=0; /*reset pending command*/
+} /*end of EndData()*/
+/*---Function: CloseConn()
+Standard way to close TCP connection */
+int CloseConn(SOCKET *hSock,LPSTR achInBuf,int len,HWND hWnd)
+{
+	char achDiscard[BUF_SIZE];
+	int nRet;
+	if(*hSock!=INVALID_SOCKET)
+	{
+		/*disable async notification if window handle provided*/
+		if(hWnd)
+		{
+			nRet=WSAAsyncSelect(*hSock,hWnd,0,0);
+			if(nRet==SOCKET_ERROR)
+				WSAperror(WSAGetLastError(), "CloseConn() WSAAsyncSelect()");
+		}
+		/* half-closing the connection*/
+		shutdown(*hSock, 1);
+		/*read remaining data*/
+		nRet=1;
+		while(nRet && (nRet!=SOCKET_ERROR))
+		{
+			if(achInBuf)
+				nRet=RecvData(*hSock,hDataFile,achInBuf,len);
+			else
+				nRet=recv(*hSock,(LPSTR)achDiscard,BUF_SIZE,0);
+		}
+		/*closing the socket*/
+		closesocket(*hSock);
+		*hSock=INVALID_SOCKET; /*invalidate socket*/
+	}
+	return(nRet);
+} /*end of CloseConn()*/
