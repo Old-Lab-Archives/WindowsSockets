@@ -742,3 +742,78 @@ int SendFtpCmd(void)
 		}
 		return(nRet);
 	} /*end of RecvFtpRply()*/
+/*--Function: ProcessFtpRply()
+	Figuring out what happened and what to do next
+	*/
+	void ProcessFtpRply(LPSTR szRply, int nBufLen)
+	{
+		LPSTR szFtpRply;
+		int nPendingFtpCmd, i;
+		szFtpRply=szRply;
+		while((*(szFtpRply+3)=='-')||((*(szFtpRply)==' ')&&(*(szFtpRply+1)==' ')&&(*(szFtpRply+2)==' ')))
+		{
+			/*find end of reply line*/
+			for(i=0;*szFtpRply!=0X0a && *szFtpRply && i<nBufLen-3;szFtpRply++,i++);
+			szFtpRply++; /*goto beginning of next reply*/
+			if(!(*szFtpRply)) /*quit if end of string*/
+				return;
+		}
+		*szFtpCmd=0; /*disable old command string*/
+		nPendingFtpCmd=astFtpCmd[0].nFtpCmd; /*save last FTP command*/
+		if((*szFtpRply!='1')&&(nPendingFtpCmd!=LIST)&&(nPendingFtpCmd!=STOR)&&(nPendingFtpCmd!=RETR))
+			/*for any starter reply, clear old commands*/
+			astFtpCmd[0].nFtpCmd=0;
+		/*first digit in 3-digit FTP reply code is the most significant*/
+		switch(*szFtpRply)
+		{
+		case('1'): /*positive preliminary reply*/
+			break;
+		case('2'): /*positive completion reply*/
+			switch(nPendingFtpCmd)
+			{
+			case 0:
+				/*check if service ready for user*/
+				if((*(szFtpRply+1)=='2') && (*(szFtpRply+2)=='0'))
+					QueueFtpCmd(USER, szUser);
+				break;
+			case CWD:
+			case USER:
+			case PASS:
+				/*Duh-uh! We are logged in now fellas. Get remote working directory */
+				QueueFtpCmd(PWD,0);
+				break;
+			case PWD:
+				/*display remote working directory*/
+				SetDlgItemText(hWinMain,IDC_RPWD,&szFtpRply[4]);
+				break;
+			case TYPE:
+			case PORT:
+				/*send next command if it's already queued*/
+				SendFtpCmd();
+				break;
+			case ABOR:
+				/*close the data socket*/
+				if(hDataSock!=INVALID_SOCKET)
+					CloseConn(&hDataSock,(PSTR)0,0,hWinMain);
+				break;
+			case QUIT:
+				/*close the control socket*/
+				if(hCtrlSock!=INVALID_SOCKET)
+					CloseConn(&hCtrlSock,(PSTR)0,0,hWinMain);
+				break;
+			default:
+				break;
+			}
+			break;
+		case ('3'): /*positive intermediate reply*/
+			if(nPendingFtpCmd==USER)
+				QueueFtpCmd(PASS, szPwrd);
+			break;
+		case ('4'): /*transient negative completion reply*/
+		case ('5'): /*permanent negative completion reply*/
+			/*if port failed, forget about queued commands*/
+			if(nPendingFtpCmd!=ABOR)
+				QueueFtpCmd(ABOR,0);
+			break;
+		}
+	} /*end of ProcessFtpRply()*/
