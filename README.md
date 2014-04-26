@@ -1,5 +1,5 @@
-Welcome! <br>
-Pre-requisites: Must be strong in 1. OSI-Layers, 2. basic knowledge in sockets, 3. basic coding skills <br>
+Welcome! <br><br>
+Pre-requisites: Must be strong in 1. OSI-Layers, 2. basic knowledge in TCP/IP & sockets, 3. basic coding skills <br>
 <br>
 Here is the rough architecture i designed for this project:-
 http://t.co/UOIvFxYQDu
