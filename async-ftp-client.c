@@ -1227,4 +1227,30 @@ wsprintf(achErrBuf,"%s failed,%-40c\n\n%s",szFuncName,' ',achErrMsg);
 MessageBox(GetActiveWindow,achErrBuf,"Error",MB_OK | MB_ICONHAND);
 return;
 } /*end of WSAperror() */
-
+/*Function: AcceptDataConn()
+Accept an incoming data connection
+*/
+SOCKET AcceptDataConn(SOCKET hLstn, PSOCKADDR_IN pstName)
+{
+	SOCKET hDataSock;
+	int nRet, nLen=SOCKADDR_LEN, nOptval;
+	hDataSock=accept(hLstnSock,(LPSOCKADDR)pstName,(LPINT)&nLen);
+	if(hDataSock==SOCKET_ERROR)
+	{
+		int WSAErr=WSAGetLastError();
+		if(WSAErr!=WSAEWOULDBLOCK)
+			WSAperror(WSAErr,"accept");
+	}
+	else if(bReAsync)
+	{
+		nRet=WSAAsyncSelect(hDataSock,hWinMain,WSA_ASYNC+1,(FD_READ | FD_WRITE | FD_CLOSE));
+		if(nRet==SOCKET_ERROR)
+		{
+			WSAperror(WSAGetLastError(),"WSAAsyncSelect()");
+		}
+		/*getting buffer space*/
+		nOptval=astFtpCmd[0].nFtpCmd==STOR ? SO_SNDBUF : SO_RCVBUF;
+		GetBuf(hDataSock,INPUT_SIZE*2,nOptval);
+	}
+	return(hDataSock);
+} /*end of AcceptDataConn()*/
