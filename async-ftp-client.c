@@ -1254,3 +1254,86 @@ SOCKET AcceptDataConn(SOCKET hLstn, PSOCKADDR_IN pstName)
 	}
 	return(hDataSock);
 } /*end of AcceptDataConn()*/
+/*--Function: SendData()
+Open data file, read and send */
+long SendData(SOCKET *hDataSock, HFILE hDataFile, int len)
+{
+	static int cbReadFromFile; /* Bytes read from file */
+	static int cbSentToServer; /*number of buffered bytes sent*/
+	static HFILE hLastFile; /*handle of last file sent*/
+	long cbTotalSent=0; /*total bytes sent*/
+	int nRet,WSAErr,cbBytesToSend;
+	/*reset our counters when we access a new file*/
+	if(hLastFile!=hDataFile)
+	{
+		cbReadFromFile=0;
+		cbSentToServer=0;
+		hLastFile=hDataFile;
+	}
+	/*read data from file and send it*/
+	do
+	{
+		if(bIOBeep)
+			MessageBeep(0XFFFF);
+		/*calculate what's left to send*/
+		cbBytesToSend=cbReadFromFile - cbSentToServer;
+		if(cbBytesToSend <= 0)
+		{
+			/*read data from input file*/
+			if(!bFromNul)
+			{
+				cbReadFromFile= _lread(hDataFile,achOutBuf,INPUT_SIZE);
+				if(cbReadFromFile==HFILE_ERROR)
+				{
+					MessageBox(hWinMain,"error reading data file","SendData( ) failed",MB_OK | MB_ICONASTERISK);
+					break;
+				}
+				else if(!cbReadFromFile)
+				{
+					/*no more data to send*/
+					CloseConn(hDataSock,(PSTR)0,0,hWinMain);
+					EndData( );
+					break;
+				}
+				else
+				{
+					cbBytesToSend=cbReadFromFile;
+				}
+			}
+			else
+			{
+					/*just send whatever is in memory*/
+					if(lByteCount < MAXNULPUT)
+					{
+						cbBytesToSend=INPUT_SIZE;
+					}
+					else
+					{
+						CloseConn(hDataSock,(PSTR)0,0,hWinMain);
+						EndData();
+					}
+				}
+				cbSentToServer=0; /*reset tally*/
+			}
+				/*send data to server*/
+				nRet=send(*hDataSock, &(achOutBuf[cbSentToServer]),((len<cbBytesToSend) ? len : cbBytesToSend), 0);
+				if(nRet==SOCKET_ERROR)
+				{
+					WSAErr=WSAGetLastError();
+					/*display significant errors*/
+					if(WSAErr!=WSAEWOULDBLOCK)
+						WSAperror(WSAErr,(LPSTR)"send()");
+				}
+				else
+				{
+					/*update byte counter and display*/
+					lByteCount+=nRet;
+					_ltoa(lByteCount,achTempBuf,10);
+					SetDlgItemText(hWinMain,IDC_DATA_RATE,achTempBuf);
+					cbSentToServer+=nRet; /*tally bytes sent since last file read*/
+					cbTotalSent+=nRet; /*tally total bytes sent since started*/
+				}
+	}
+			while(nRet!=SOCKET_ERROR);
+			return(cbTotalSent);
+}/*end of SendData()*/
