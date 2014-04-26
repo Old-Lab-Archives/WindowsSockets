@@ -817,3 +817,72 @@ int SendFtpCmd(void)
 			break;
 		}
 	} /*end of ProcessFtpRply()*/
+/*--Function: InitDataConn()
+	Setup a listening socket for data connection */
+	SOCKET InitDataConn(PSOCKADDR_IN lpstName,HWND hDlg,u_int nAsyncMsg)
+	{
+		int nRet;
+		SOCKET hLstnSock;
+		int nLen=SOCKADDR_LEN;
+		/*get a TCP socket to use for data connection listen*/
+		hLstnSock=socket(AF_INET,SOCK_STREAM,0);
+		if(hLstnSock==INVALID_SOCKET)
+		{
+			WSAperror(WSAGetLastError(),"socket()");
+		}
+		else
+		{
+			/*request async notification for most events*/
+			nRet=WSAAsyncSelect(hLstnSock,hDlg,nAsyncMsg,(FD_ACCEPT | FD_READ | FD_WRITE | FD_CLOSE));
+			if(nRet==SOCKET_ERROR)
+			{
+				WSAperror(WSAGetLastError(),"WSAAsyncSelect()");
+			}
+			else
+			{
+				/*name the local socket with bind()*/
+				lpstName->sin_family=PF_INET;
+				lpstName->sin_port=0;
+				nRet=bind(hLstnSock,(LPSOCKADDR)lpstName,SOCKADDR_LEN);
+				if(nRet==SOCKET_ERROR)
+				{
+					WSAperror(WSAGetLastError(),"bind()");
+				}
+				else
+				{
+					/*get local port number assigned by bind()*/
+					nRet=getsockname(hLstnSock,(LPSOCKADDR)lpstName,(int FAR *)&nLen);
+					if(nRet==SOCKET_ERROR)
+					{
+						WSAperror(WSAGetLastError(),"getsockname()");
+					}
+					else
+					{
+						/*listen for incoming connection requests*/
+						nRet=listen(hLstnSock,5);
+						if(nRet==SOCKET_ERROR)
+						{
+							WSAperror(WSAGetLastError(),"listen()");
+						}
+					}
+				}
+			}
+			/*if we haven't had error, also don't know local IP address, then we gotta try before we return*/
+			if(!lpstName->sin_addr.s_addr)
+			{
+				lpstName->sin_addr.s_addr=GetHostID( );
+				if(!lpstName->sin_addr.s_addr)
+				{
+					MessageBox(hDlg,"unable to get local IP address","InitConn( ) Failed", MB_OK | MB_ICONASTERISK);
+					nRet=SOCKET_ERROR;
+				}
+			}
+			/*if we get error and yet don't know our IP address, we are in deep shit. Clean up! */
+			if(nRet==SOCKET_ERROR)
+			{
+				closesocket(hLstnSock);
+				hLstnSock=INVALID_SOCKET;
+			}
+		}
+		return(hLstnSock);
+	} /*end of InitDataConn()*/
