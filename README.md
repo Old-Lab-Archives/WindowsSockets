@@ -18,6 +18,7 @@ async_echo_server_tcp.c <br>
 async_udp_time_ClientServer.c <br>
 Now, in-progress coding WinSock API DLL for TCP clients
 <br>
+Note: What is "Customized"?? --- Answer:- "No" direct copy-paste mechanism is used. Every line is being coded with the individual's fingers and few modifications are done.
 <br> <br>
 Remaining header files contains "licensed comment lines" crediting Microsoft because I haven't customized yet. <br>
 Hoping to reduce header files... this is my starter project on Windows Sockets.. So, i may give only average outputs <br>
