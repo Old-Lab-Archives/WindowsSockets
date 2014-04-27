@@ -12,6 +12,9 @@ WSA_Xtra.h <br>
 winsockx.h <br>
 async-ftp-client.h <br> <br>
 
+Customized library: <br>
+winsock.lib <br><br>
+
 Customized source codes: <br>
 async-ftp-client.c <br>
 async_echo_server_tcp.c <br>
