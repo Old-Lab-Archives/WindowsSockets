@@ -6,6 +6,7 @@ http://t.co/UOIvFxYQDu
 <br>
 Comparison between Windows Sockets and BSD sockets: http://ashumeow.tumblr.com/image/83730373618
 <br>
+WinSock API DLL : http://ashumeow.tumblr.com/image/84153394732 <br>
 Customized Header Files: <br>
 winsock.h <br>
 WSA_Xtra.h <br>
