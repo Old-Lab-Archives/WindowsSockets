@@ -124,3 +124,92 @@ LONG FAR PASCAL EXPORT SubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
 		return(0L);
 	}
 } /*end of SubclassProc() */
+/*Function:--- ConnectTCP()
+Get a TCP socket and connect to server */
+SOCKET WINAPI ConnectTCP(LPSTR szDestination, LPSTR szService)
+{
+	int nRet;
+	HTASK hTask;
+	SOCKET hSock;
+	LPTASKDATA lpstTask;
+	LPCONNDATA lpstConn;
+	SOCKADDR_IN stRmtName;
+	hTask=GetCurrentTask(); /*task handle: for our records*/
+	lpstTask=FindTask(hTask);
+	if(lpstTask)
+	{
+		/*get TCP socket*/
+		hSock=socket(AF_INET,SOCK_STREAM,0);
+		if(hSock==INVALID_SOCKET)
+		{
+			WSAperror(WSAGetLastError()."socket()");
+		}
+		else
+		{
+			/*get destination address*/
+			stRmtName.sin_addr.s_addr=GetAddr(szDestination);
+			if(stRmtName.sin_addr.s_addr!=INADDR_NONE)
+			{
+				/*get destination port number*/
+				stRmtName.sin_port=GetPort(szService);
+				if(stRmtName.sin_port)
+				{
+					/*create a new socket structure*/
+					lpstConn = NewConn(hSock,&stRmtName);
+					if(lpstConn)
+					{
+						/*subclass the active window passed*/
+						lpstConn->lpstTask=lpstTask;
+						lpstConn->hwnd=GetActiveWindow();
+						lpstConn->lpfnWndProc=GetWindowLong(lpstConn->hwnd,GWL_WNDPROC);
+						SetWindowLong(lpstConn->hwnd,GWL_WNDPROC,(DWORD)SubclassProc);
+						/*initiate non-blocking connect to server*/
+						stRmtName.sin_family = PF_INET;
+						nRet = connect(hSock,(LPSOCKADDR)&stRmtName,SOCKADDR_LEN);
+						if(nRet==SOCKET_ERROR)
+						{
+							int WSAErr = WSAGetLastError();
+							if(WSAErr!=WSAEINTR)
+							{
+								SetWindowLong(lpstConn->hwnd,GWL_WNDPROC,(DWORD)lpstConn->lpfnWndProc);
+								WSAperror(WSAErr,"connect()");
+								RemoveConn(lpstConn);
+								closesocket(hSock);
+								hSock=INVALID_SOCKET;
+							}
+						}
+					}
+					else
+					{
+						/*unable to create a connection structure*/
+						closesocket(hSock);
+						hSock = INVALID_SOCKET;
+					}
+				}
+				else
+				{
+					/*unable to resolve destination port number*/
+					closesocket(hSock);
+					hSock = INVALID_SOCKET;
+				}
+			}
+			else
+			{
+				/*unable to resolve destination address*/
+				closesocket(hSock);
+				hSock = INVALID_SOCKET;
+			}
+		}
+		/*if failed, then clean up*/
+		if(hSock==INVALID_SOCKET)
+		{
+			RemoveTask(lpstTask);
+		}
+		else if(lpstConn)
+		{
+			/*un-subclass active window before leaving*/
+			SetWindowLong(lpstConn->hwnd, GWL_WNDPROC,(DWORD)lpstConn->LpfnWndProc);
+		}
+	}
+	return(hSock);
+} /*end of ConnectTCP()*/
