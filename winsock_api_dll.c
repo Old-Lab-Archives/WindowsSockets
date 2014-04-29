@@ -213,3 +213,41 @@ SOCKET WINAPI ConnectTCP(LPSTR szDestination, LPSTR szService)
 	}
 	return(hSock);
 } /*end of ConnectTCP()*/
+/*Function:-- SendData()
+Send data to socket from the buffer passed until the requested number of bytes is sent */
+int WINAPI SendData(SOCKET hSock,LPSTR lpOutBuf,int cbTotalToSend)
+{
+	LPCONNDATA lpstConn;
+	int cbTotalSent=0, cbSent;
+	int nRet=SOCKET_ERROR; /*assume error*/
+	lpstConn=FindConn(hSock,0);
+	if(!lpstConn)
+	{
+		/*socket not found, so it's not valid*/
+		WSASetLastError(WSAENOTSOCK);
+	}
+	else
+	{
+		/*subclass the window provided at connect to filter messages*/
+		SetWindowLong(lpstConn->hwnd, GWL_WNDPROC, (DWORD)SubclassProc);
+		while(((cbTotalToSend - cbTotalSent) > 0) && (lpstConn->hSock!=INVALID_SOCKET))
+		{
+			cbSent = DoSend(hSock, lpOutBuf+cbTotalSent, cbTotalToSend - cbTotalSent, lpstConn);
+			if(cbSent != SOCKET_ERROR)
+			{
+				/*evaluate and quit the loop*/
+				cbTotalSent += cbSent;
+				if((cbTotalToSend - cbTotalSent) <= 0)
+					break;
+			}
+			else
+			{
+				/*if send failed, return error*/
+				cbTotalSent=SOCKET_ERROR;
+			}
+		}
+		/*un-subclass active window before leaving*/
+		SetWindowLong(lpstConn->hwnd, GWL_WNDPROC, (long)lpstConn->lpfnWndProc);
+	}
+	return(cbTotalSent);
+} /*end of SendData() */
