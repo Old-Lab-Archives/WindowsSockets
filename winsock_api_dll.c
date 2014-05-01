@@ -377,3 +377,41 @@ int DoRecv(SOCKET hSock, LPSTR lpInBuf, int cbTotalToRecv, LPCONNDATA lpstConn)
 	}
 	return(cbTotalRcvd);
 } /*end of DoRecv()*/
+/*Function:--- CloseTCP()*/
+int WINAPI CloseTCP(SOCKET hSock, LPSTR lpfnBuf, int len)
+{
+	int nRet=SOCKET_ERROR, cbBytesDone=0;
+	LPCONNDATA lpstConn;
+	lpstConn=FindConn(hSock, 0);
+	if(!lpstConn)
+	{
+		/*socket not found if not valid*/
+		WSASetLastError(WSAENOTSOCK);
+	}
+	else
+	{
+		if(WSAIsBlocking())
+		{
+			WSACancelBlockingCall();
+		}
+		else
+		{
+			/*signal the end*/
+			lpstConn->hSock=INVALID_SOCKET;
+			/*half close the sockets*/
+			nRet=shutdown(hSock, 1);
+			/*read and discard remaining data*/
+			nRet=1;
+			while(nRet && (nRet!=SOCKET_ERROR))
+			{
+				nRet=recv(hSock, lpInBuf, len-cbBytesDone, 0);
+				if(nRet > 0)
+					cbBytesDone+=nRet;
+			}
+			/*closing socket*/
+			nRet=closesocket(hSock);
+		}
+		RemoveConn(lpstConn);
+	}
+	return(nRet);
+} /*end of closeTCP() */
