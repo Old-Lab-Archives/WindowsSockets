@@ -487,3 +487,96 @@ void RemoveConn(LPCONNDATA lpstConn)
 	LocalUnlock(hConnTmp);
 	LocalFree(hConnTmp);
 } /*end of RemoveConn() */
+/*---Function: NewTask()
+Register current task with WinSock DLL by calling WSAStartup() and create a new task structure */
+LPTASKDATA NewTask(HTASK hTask)
+{
+	HANDLE hTaskData;
+	LPTASKDATA lpstTask=(LPTASKDATA)0;
+	int nRet;
+	/*register task with Winsock DLL*/
+	nRet=WSASTartup(WSA_VERSION, &stWSAData);
+	if(nRet!=0)
+	{
+		hWinData=GetActiveWindow();
+		WSAperror(nRet,"WSAStartup()");
+	}
+	else
+	{
+		/*allocate memory for new window structure*/
+		hTaskData=LocalAlloc(LMEM_MOVEABLE|LMEM_ZEROINIT,sizeof(TASKDATA));
+		if(hTaskData)
+		{
+			/*convert it to a pointer*/
+			lpstTask=(LPTASKDATA) LocalLock (hTaskData);
+			if(lpstTask)
+			{
+				/*initialize structure*/
+				lpstTask->hTask=hTask;
+				lpstTask->nRefCount=1;
+				/*link this new record into our linked list*/
+				if(!lpstTaskHead)
+				{
+					lpstTaskHead=lpstTask;
+				}
+				else
+				{
+					LPTASKDATA lpstTaskTmp;
+					for(lpstTaskTmp=lpstTaskHead;lpstTaskTmp->lpstNext;lpstTaskTmp=lpstTaskTmp->lpstNext);
+				}
+			}
+			else
+			{
+				/*set error to indicate memory problems and free memory*/
+				WSASetLastError(WSAENOBUFS);
+				LocalFree(hTaskData);
+			}
+		}
+		else
+		{
+			/*set error to indicate that we couldn't allocate memory*/
+			WSASetLastError(WSAENOBUFS);
+		}
+	}
+	return(lpstTask);
+} /*end of NewTask() */
+/*Function:-- FindTask()
+Find task structure using task handle as key ---*/
+LPTASKDATA FindTask(HTASK hTask)
+{
+	LPTASKDATA lpstTaskTmp;
+	for(lpstTaskTmp=lpstTaskHead;lpstTaskTmp;lpstTaskTmp=lpstTaskTmp->lpstNext)
+	{
+		if(lpstTaskTmp->hTask==hTask)
+			break;
+	}
+	return(lpstTaskTmp);
+} /*end of FindConn() */
+/*Function:-- RemoveTask() */
+void RemoveTask(LPTASKDATA lpstTask)
+{
+	LPTASKDATA lpstTaskTmp;
+	HLOCAL hTaskTmp;
+	lpstTask->nRefCount--;
+	if(lpstTask->nRefCount<=0)
+	{
+		/*reference count is zero, so free the task structure*/
+		if(lpstTask==lpstTaskHead)
+		{
+			lpstTaskHead=lpstTask->lpstNext;
+		}
+		else
+		{
+			for(lpstTaskTmp=lpstTaskHead;lpstTaskTmp;lpstTaskTmp=lpstTaskTmp->lpstNext)
+			{
+				if(lpstTaskTmp->lpstNext==lpstTask)
+					lpstTaskTmp->lpstNext=lpstTask->lpstNext;
+			}
+		}
+		hTaskTmp=LocalHandle((void NEAR*)lpstTask);
+		LocalUnlock(hTaskTmp);
+		LocalFree(hTaskTmp);
+		/*call WSACleanup() to de-register task with WinSock*/
+		WSACleanup();
+	}
+} /*end of RemoveTask()*/
