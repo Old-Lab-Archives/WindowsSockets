@@ -308,3 +308,36 @@ int WINAPI RecvData(SOCKET hSock, LPSTR lpInBuf, int cbTotalToRecv, int nTimeout
 	}
 		return (cbTotalRcvd);
 } /*end of RecvData()*/
+/*function: DoSend() --- Loop to send data*/
+int DoSend(SOCKET hSock, LPSTR lpoutBuf, int cbTotalToSend, LPCONNDATA lpstConn)
+{
+	int cbTotalSent=0;
+	int cbLeftToSend=cbTotalToSend;
+	int nRet, WSAErr;
+	/*sending data*/
+	while(cbLeftToSend > 0)
+	{
+		/*send data to client*/
+		nRet=send(hSock, lpOutBuf+cbTotalSent,cbLeftToSend < MTU_SIZE ? cbLeftToSend : MTU_SIZE, 0);
+		if(nRet==SOCKET_ERROR)
+		{
+			WSAErr=WSAGetLastError();
+			/*display all errors except operations interrupted*/
+			if(WSAErr!=WSAEINTR)
+			{
+				/*unsubclass first, so user can respond to error*/
+				SetWindowLong(lpstConn->hwnd, GWL_WNDPROC, (DWORD)lpstConn->lpfnWndProc);
+				WSAperror(WSAErr, (LPSTR)"send()");
+			}
+			break;
+		}
+		else
+		{
+			/*update byte counter and display*/
+			cbTotalSent+=nRet;
+		}
+		/*calculate the remaining*/
+		cbLeftToSend=cbTotalSent - cbTotalToSend;
+	}
+	return(cbTotalSent);
+} /*end of DoSend()*/
