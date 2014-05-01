@@ -251,3 +251,60 @@ int WINAPI SendData(SOCKET hSock,LPSTR lpOutBuf,int cbTotalToSend)
 	}
 	return(cbTotalSent);
 } /*end of SendData() */
+/*Function: RecvData()
+Received data from socket into buffer passed until the requested number of bytes is received or timeout period is exceeded*/
+int WINAPI RecvData(SOCKET hSock, LPSTR lpInBuf, int cbTotalToRecv, int nTimeout)
+{
+	LPCONNDATA lpstConn;
+	int cbTotalRcvd=0, cbRcvd;
+	int nRet=SOCKET_ERROR; /*assume error*/
+	lpstConn=FindConn(hSock,0);
+	if(!lpstConn)
+	{
+		/*socket not found and so no way of validity bro */
+		WSASetLastError(WSAENOTSOCK);
+	}
+	else
+	{
+		/*subclass the active window to filter message traffic*/
+		SetWindowLong(lpstConn->hwnd, GWL_WNDPROC, (DWORD)SubclassProc);
+		/*set a timer if requested*/
+		if(nTimeout)
+		{
+			lpstConn->nTimeout=nTimeout;
+			SetTimer(hWinMain, TIMEOUT_ID, nTimeout, 0L);
+		}
+		while(((cbTotalToRecv - cbTotalRcvd) > 0) && (lpstConn->hSock!=INVALID_SOCKET))
+		{
+			cbRcvd=DoRecv(hSock, lpInBuf+cbTotalToRecv, cbTotalToRecv - cbTotalRcvd, lpstConn);
+			if(cbRcvd!=SOCKET_ERROR)
+			{
+				/*Evaluate and quit if we've received the amount requested*/
+				cbTotalRcvd+=cbRcvd;
+				if((cbTotalToRecv - cbTotalRcvd) <= 0)
+				{
+					if(lpstConn->nTimeout)
+					{
+						/*reset timer*/
+						KillTimer(lpstConn->hwnd, TIMEOUT_ID);
+						break;
+					}
+					if(lpstConn->nTimeout)
+					{
+						/*reset timer*/
+						SetTimer(hWinMain, TIMEOUT_ID, lpstConn->nTimeout, 0L);
+					}
+				}
+				else
+				{
+					/*if receive failed, we return an error*/
+					cbTotalRcvd=SOCKET_ERROR;
+				}
+			}
+			/*unsubclass active window before leaving*/
+			SetWindowLong(lpstConn->hwnd, GWL_WNDPROC, (long)lpstConn->lpfnWndProc);
+			lpstConn->nTimeout=0; /*reset timer*/
+		}
+	}
+		return (cbTotalRcvd);
+} /*end of RecvData()*/
