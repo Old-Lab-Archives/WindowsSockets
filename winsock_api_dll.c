@@ -341,3 +341,39 @@ int DoSend(SOCKET hSock, LPSTR lpoutBuf, int cbTotalToSend, LPCONNDATA lpstConn)
 	}
 	return(cbTotalSent);
 } /*end of DoSend()*/
+/*--Function: DoRecv() --- Loop to receive data--*/
+int DoRecv(SOCKET hSock, LPSTR lpInBuf, int cbTotalToRecv, LPCONNDATA lpstConn)
+{
+	int cbTotalRcvd=0;
+	int cbLeftToRecv=cbTotalToRecv;
+	int nRet=0, WSAErr;
+	/*buffer reading from client*/
+	while(cbLeftToRecv > 0)
+	{
+		nRet=recv(hSock,lpInBuf+cbTotalRcvd,cbLeftToRecv,0);
+		if(nRet==SOCKET_ERROR)
+		{
+			WSAErr=WSAGetLastError();
+			/*display all errors except operations interrupted*/
+			if(WSAErr!=WSAEINTR)
+			{
+				WSAperror(WSAErr,(LPSTR)"recv()");
+				/*unsubcalss first, so user can respond to error*/
+				SetWindowLong(lpstConn->hwnd,GWL_WNDPROC,(DWORD)lpstConn->lpfnWndProc);
+			}
+			break;
+		}
+		else if(nRet==0)
+		{
+			/*quit if server closed connection*/
+			break;
+		}
+		else
+		{
+			/*update byte counter*/
+			cbTotalRcvd+=nRet;
+		}
+		cbLeftToRecv=cbTotalToRecv - cbTotalRcvd;
+	}
+	return(cbTotalRcvd);
+} /*end of DoRecv()*/
