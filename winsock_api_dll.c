@@ -415,3 +415,75 @@ int WINAPI CloseTCP(SOCKET hSock, LPSTR lpfnBuf, int len)
 	}
 	return(nRet);
 } /*end of closeTCP() */
+/*Function:--- NewConn()
+Creating a new socket structure and put in list */
+LPCONNDATA NewConn(SOCKET hSock, PSOCKADDR_IN lpstRmtName)
+{
+	int nAddrSize=sizeof(SOCKADDR);
+	LPCONNDATA lpstConnTmp;
+	LPCONNDATA lpstConn=(LPCONNDATA)0;
+	HLOCAL hConnData;
+	/*allocate memory for new socket structure*/
+	hConnData=LocalAlloc(LMEM_ZEROINIT, sizeof(CONNDATA));
+	if(hConnData)
+	{
+		/*Lock it and link it into the list*/
+		lpstConn=(LPCONNDATA) LocalLock(hConnData);
+		if(!lpstConnHead)
+		{
+			lpstConnHead=lpstConn;
+		}
+		else
+		{
+			for(lpstConnTmp=lpstConnHead;lpstConnTmp && lpstConnTmp->lpstNext;lpstConnTmp->lpstNext=lpstConn)
+		}
+		/*initialize socket structure*/
+		lpstConn->hSock=hSock;
+		_fmemcpy((LPSTR)&(lpstConn->stRmtName),(LPSTR)lpstRmtName,sizeof(SOCKADDR));
+	}
+	return(lpstConn);
+} /*end of NewConn() */
+/*Function: FindConn()
+Find socket structure for connection using either socket or subclassed windowhandle as search key*/
+LPCONNDATA FindConn(SOCKET hSock, HWND hwnd)
+{
+	LPCONNDATA lpstConnTmp;
+	for(lpstConnTmp=lpstConnHead;lpstConnTmp;lpstConnTmp=lpstConnTmp->lpstNext)
+	{
+		if(hSock)
+		{
+			if(lpstConnTmp->hSock==hSock)
+				break;
+		}
+		else if(lpstConnTmp->hwnd==hwnd)
+		{
+			break;
+		}
+	}
+	return(lpstConnTmp);
+} /*end of FindConn() */
+/*Function:-- RemoveConn()
+Free the memory for socket structure and free task structure also and remove them from linked list*/
+void RemoveConn(LPCONNDATA lpstConn)
+{
+	LPCONNDATA lpstConnTmp;
+	HLOCAL hConnTmp;
+	if(lpstConn==lpstConnHead)
+	{
+		lpstConnHead=lpstConn->lpstNext;
+	}
+	else
+	{
+		for(lpstConnTmp=lpstConnHead;lpstConnTmp;lpstConnTmp=lpstConnTmp->lpstNext)
+		{
+			if(lpstConnTmp->lpstNext==lpstConn)
+			{
+				lpstConnTmp->lpstNext=lpstConn->lpstNext;
+			}
+		}
+	}
+	RemoveTask(lpstConn->lpstTask);
+	hConnTmp=LocalHandle((void NEAR*)lpstConn);
+	LocalUnlock(hConnTmp);
+	LocalFree(hConnTmp);
+} /*end of RemoveConn() */
